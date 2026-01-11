@@ -1,0 +1,52 @@
+name: Build WDA for iOS 18
+on: workflow_dispatch  # 允许手动触发构建
+
+jobs:
+  build-wda:
+    runs-on: macos-14  # macOS Sonoma (支持 Xcode 16/15)
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Setup Xcode
+        # 修复: 调整顺序优先寻找 Xcode 16.0 (iOS 18 SDK)
+        run: sudo xcode-select -s /Applications/Xcode_16.0.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode_16.1.app/Contents/Developer || sudo xcode-select -s /Applications/Xcode_15.4.app/Contents/Developer
+
+      - name: Prepare WDA
+        # 核心修复 1: 提供 GITHUB_ACCESS_TOKEN 以解决 Rate Limit 问题，允许下载预编译二进制
+        env:
+          GITHUB_ACCESS_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        # 核心修复 2: 设置 npm legacy-peer-deps 避免 Inspector 依赖冲突
+        # 核心修复 3: 使用 sed 删除项目对 XCTAutomationSupport 的显式引用，绕过链接器权限检查
+        run: |
+          npm config set legacy-peer-deps true
+          ./Scripts/bootstrap.sh
+          sed -i '' '/XCTAutomationSupport.framework/d' WebDriverAgent.xcodeproj/project.pbxproj
+
+      - name: Build Unsigned IPA
+        # 核心修复 4: IPHONEOS_DEPLOYMENT_TARGET=16.0 强制使用新版目标
+        # 核心修复 5: 使用 -undefined dynamic_lookup 允许运行时查找私有符号，解决链接报错
+        run: |
+          mkdir -p Payload
+          xcodebuild build-for-testing \
+            -project WebDriverAgent.xcodeproj \
+            -scheme WebDriverAgentRunner \
+            -sdk iphoneos \
+            -configuration Release \
+            -derivedDataPath ./Build/ \
+            CODE_SIGN_IDENTITY="" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_ENTITLEMENTS="" \
+            CODE_SIGNING_ALLOWED=NO \
+            IPHONEOS_DEPLOYMENT_TARGET=16.0 \
+            GCC_TREAT_WARNINGS_AS_ERRORS=NO \
+            OTHER_LDFLAGS="-Wl,-undefined,dynamic_lookup"
+
+          cp -r ./Build/Build/Products/Release-iphoneos/WebDriverAgentRunner-Runner.app ./Payload/
+          zip -r WDA_Unsigned.ipa Payload
+
+      - name: Upload IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: WDA_iOS18_Unsigned
+          path: WDA_Unsigned.ipa
