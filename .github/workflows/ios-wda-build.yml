@@ -6,7 +6,7 @@ jobs:
     name: Build WebDriverAgentRunner
     runs-on: macos-14 # macOS Sonoma 支持 Xcode 16 (iOS 18 SDK)
     env:
-      XCODE_VERSION: "16.0" # 指定 Xcode 版本
+      XCODE_VERSION: "16.2" # 修复: 更新为环境支持的 16.2 版本
       WDA_SCHEME: "WebDriverAgentRunner"
 
     steps:
