@@ -7,6 +7,8 @@ jobs:
     steps:
       - name: Checkout Code
         uses: actions/checkout@v4
+        # 默认拉取当前仓库(hack0303/WebDriverAgent)的代码
+        # 如果之前因为路径问题失败，这通常能解决问题，只要您的仓库根目录有 Scripts 文件夹
 
       - name: Setup Xcode
         # 修复: 调整顺序优先寻找 Xcode 16.0 (iOS 18 SDK)
